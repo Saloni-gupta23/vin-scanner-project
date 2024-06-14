@@ -1,35 +1,41 @@
 import React, { useState, useRef, useEffect } from 'react';
-import Webcam from 'react-webcam';
-import { BrowserMultiFormatReader } from '@zxing/library';
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 import './App.css';
 
 const App = () => {
   const [vin, setVin] = useState('');
   const [showScanner, setShowScanner] = useState(false);
-  const webcamRef = useRef(null);
-  const barcodeReader = new BrowserMultiFormatReader();
-
-  const handleScan = async () => {
-    const imageSrc = webcamRef.current.getScreenshot();
-    if (imageSrc) {
-      try {
-        const result = await barcodeReader.decodeFromImage(undefined, imageSrc);
-        if (result) {
-          setVin(result.text);
-          setShowScanner(false);
-        }
-      } catch (err) {
-        console.log('Barcode not detected:', err);
-      }
-    }
-  };
+  const [isScanning, setIsScanning] = useState(false);
+  const scannerRef = useRef(null);
+  const codeReader = useRef(new BrowserMultiFormatReader());
 
   useEffect(() => {
     if (showScanner) {
-      const interval = setInterval(handleScan, 500);
-      return () => clearInterval(interval);
+      startScanner();
+    } else {
+      codeReader.current.reset();
     }
+    return () => {
+      codeReader.current.reset();
+    };
   }, [showScanner]);
+
+  const startScanner = () => {
+    if (scannerRef.current) {
+      setIsScanning(true);
+      codeReader.current.decodeFromVideoDevice(null, scannerRef.current, (result, err) => {
+        if (result) {
+          setVin(result.getText());
+          setShowScanner(false);
+          setIsScanning(false);
+          codeReader.current.reset();
+        }
+        if (err && !(err instanceof NotFoundException)) {
+          console.error(err);
+        }
+      });
+    }
+  };
 
   const clearVin = () => {
     setVin('');
@@ -65,18 +71,9 @@ const App = () => {
           </button>
         </div>
         {showScanner && (
-          <div className="scanner-container">
-            <Webcam 
-              audio={false}
-              ref={webcamRef}
-              screenshotFormat="image/jpeg"
-              width="100%"
-              height="100%"
-              className="webcam"
-            />
-            <div className="scanner-overlay">
-              <div className="scanner-target"></div>
-            </div>
+          <div id="scanner-container" className="scanner-container">
+            <video ref={scannerRef} className="webcam"></video>
+            {isScanning && <div className="scanning-line"></div>}
           </div>
         )}
         <div className="buttons">
