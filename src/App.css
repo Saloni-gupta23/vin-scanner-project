@@ -13,9 +13,13 @@
 }
 
 .header {
-  font-size: 24px;
+  font-size: 27px;
+  font-weight: bold;
   margin-bottom: 20px;
-  color: white;
+  color: black;
+  text-transform: uppercase;
+  text-decoration: underline;
+  font-family: 'Calibri', 'Arial', sans-serif;
 }
 
 .content {
