@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType, NotFoundException } from '@zxing/library';
+import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 import './App.css';
 
 const App = () => {
@@ -7,75 +7,38 @@ const App = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const scannerRef = useRef(null);
-  const codeReader = useRef(null);
+  const codeReader = useRef(new BrowserMultiFormatReader());
 
   useEffect(() => {
     if (showScanner) {
       startScanner();
     } else {
-      stopScanner();
+      codeReader.current.reset();
     }
     return () => {
-      stopScanner();
+      codeReader.current.reset();
     };
   }, [showScanner]);
 
   const startScanner = () => {
     if (scannerRef.current) {
       setIsScanning(true);
-      const hints = new Map();
-      const formats = [
-        BarcodeFormat.QR_CODE,
-        BarcodeFormat.CODE_128,
-        BarcodeFormat.CODE_39,
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
-        BarcodeFormat.UPC_A,
-        BarcodeFormat.UPC_E
-        // Add other formats as needed
-      ];
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
-
-      if (!codeReader.current) {
-        codeReader.current = new BrowserMultiFormatReader();
-      }
-
       codeReader.current.decodeFromVideoDevice(null, scannerRef.current, (result, err) => {
         if (result) {
-          console.log('Scanned result:', result.getText());
-          const cleanVin = cleanString(result.getText());
-          setVin(cleanVin);
+          let scannedVin = result.getText().trim().replace(/[^A-HJ-NPR-Z0-9]/g, ''); // Clean the scanned VIN
+          if (scannedVin.length > 17) {
+            scannedVin = scannedVin.substring(0, 17); // Ensure it is not longer than 17 characters
+          }
+          setVin(scannedVin);
           setShowScanner(false);
           setIsScanning(false);
-          stopScanner();
+          codeReader.current.reset();
         }
-        if (err) {
-          if (err instanceof NotFoundException) {
-            console.log('No barcode found.');
-          } else {
-            console.error('Error scanning barcode:', err);
-          }
-        }
-      }, {
-        video: {
-          facingMode: 'environment', // Use rear camera if available
-          width: 1280, // Increase resolution for better barcode detection
-          height: 720
+        if (err && !(err instanceof NotFoundException)) {
+          console.error(err);
         }
       });
     }
-  };
-
-  const stopScanner = () => {
-    if (codeReader.current) {
-      codeReader.current.reset();
-      setIsScanning(false);
-    }
-  };
-
-  const cleanString = (str) => {
-    // Remove any unwanted characters or leading/trailing whitespace
-    return str.replace(/[^A-HJ-NPR-Z0-9]/g, '').trim();
   };
 
   const clearVin = () => {
@@ -91,6 +54,11 @@ const App = () => {
     }
   };
 
+  const handleVinChange = (e) => {
+    const value = e.target.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, ''); // Clean the input value
+    setVin(value.substring(0, 17)); // Ensure the input value is not longer than 17 characters
+  };
+
   return (
     <div className="app">
       <header className="header">
@@ -103,7 +71,7 @@ const App = () => {
             type="text"
             className="input-field"
             value={vin}
-            onChange={(e) => setVin(e.target.value)}
+            onChange={handleVinChange}
             maxLength="17"
             placeholder="Enter 17-Digit VIN Number"
           />
