@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType, NotFoundException } from '@zxing/library';
 import './App.css';
 
 const App = () => {
@@ -7,34 +7,75 @@ const App = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const scannerRef = useRef(null);
-  const codeReader = useRef(new BrowserMultiFormatReader());
+  const codeReader = useRef(null);
 
   useEffect(() => {
     if (showScanner) {
       startScanner();
     } else {
-      codeReader.current.reset();
+      stopScanner();
     }
     return () => {
-      codeReader.current.reset();
+      stopScanner();
     };
   }, [showScanner]);
 
   const startScanner = () => {
     if (scannerRef.current) {
       setIsScanning(true);
+      const hints = new Map();
+      const formats = [
+        BarcodeFormat.QR_CODE,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E
+        // Add other formats as needed
+      ];
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
+
+      if (!codeReader.current) {
+        codeReader.current = new BrowserMultiFormatReader();
+      }
+
       codeReader.current.decodeFromVideoDevice(null, scannerRef.current, (result, err) => {
         if (result) {
-          setVin(result.getText());
+          console.log('Scanned result:', result.getText());
+          const cleanVin = cleanString(result.getText());
+          setVin(cleanVin);
           setShowScanner(false);
           setIsScanning(false);
-          codeReader.current.reset();
+          stopScanner();
         }
-        if (err && !(err instanceof NotFoundException)) {
-          console.error(err);
+        if (err) {
+          if (err instanceof NotFoundException) {
+            console.log('No barcode found.');
+          } else {
+            console.error('Error scanning barcode:', err);
+          }
+        }
+      }, {
+        video: {
+          facingMode: 'environment', // Use rear camera if available
+          width: 1280, // Increase resolution for better barcode detection
+          height: 720
         }
       });
     }
+  };
+
+  const stopScanner = () => {
+    if (codeReader.current) {
+      codeReader.current.reset();
+      setIsScanning(false);
+    }
+  };
+
+  const cleanString = (str) => {
+    // Remove any unwanted characters or leading/trailing whitespace
+    return str.replace(/[^A-HJ-NPR-Z0-9]/g, '').trim();
   };
 
   const clearVin = () => {
